@@ -22,6 +22,16 @@
         <property name="can-focus">False</property>
         <property name="icon-name">document-revert-symbolic</property>
     </object>
+    <object class="GtkImage" id="filter_move_up_image">
+        <property name="visible">True</property>
+        <property name="can-focus">False</property>
+        <property name="icon-name">go-up-symbolic</property>
+    </object>
+    <object class="GtkImage" id="filter_move_down_image">
+        <property name="visible">True</property>
+        <property name="can-focus">False</property>
+        <property name="icon-name">go-down-symbolic</property>
+    </object>
     <template class="FsearchFilterPreferencesWidget" parent="GtkBox">
         <property name="visible">True</property>
         <property name="can-focus">False</property>
@@ -48,6 +58,7 @@
                                 <property name="visible">True</property>
                                 <property name="can-focus">True</property>
                                 <property name="has-tooltip">True</property>
+                                <property name="reorderable">True</property>
                                 <signal name="row-activated" handler="on_filter_list_row_activated"
                                         object="FsearchFilterPreferencesWidget" swapped="no"/>
                                 <child internal-child="selection">
@@ -135,6 +146,44 @@
                                 <property name="expand">False</property>
                                 <property name="fill">True</property>
                                 <property name="position">3</property>
+                            </packing>
+                        </child>
+                        <child>
+                            <object class="GtkButton" id="filter_move_down_button">
+                                <property name="visible">True</property>
+                                <property name="sensitive">False</property>
+                                <property name="can-focus">True</property>
+                                <property name="receives-default">True</property>
+                                <property name="tooltip-text" translatable="yes">Move selected filter down</property>
+                                <property name="image">filter_move_down_image</property>
+                                <property name="always-show-image">True</property>
+                                <signal name="clicked" handler="on_filter_move_down_button_clicked"
+                                        object="FsearchFilterPreferencesWidget" swapped="no"/>
+                            </object>
+                            <packing>
+                                <property name="expand">False</property>
+                                <property name="fill">True</property>
+                                <property name="pack-type">end</property>
+                                <property name="position">4</property>
+                            </packing>
+                        </child>
+                        <child>
+                            <object class="GtkButton" id="filter_move_up_button">
+                                <property name="visible">True</property>
+                                <property name="sensitive">False</property>
+                                <property name="can-focus">True</property>
+                                <property name="receives-default">True</property>
+                                <property name="tooltip-text" translatable="yes">Move selected filter up</property>
+                                <property name="image">filter_move_up_image</property>
+                                <property name="always-show-image">True</property>
+                                <signal name="clicked" handler="on_filter_move_up_button_clicked"
+                                        object="FsearchFilterPreferencesWidget" swapped="no"/>
+                            </object>
+                            <packing>
+                                <property name="expand">False</property>
+                                <property name="fill">True</property>
+                                <property name="pack-type">end</property>
+                                <property name="position">5</property>
                             </packing>
                         </child>
                         <style>

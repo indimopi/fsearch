@@ -23,6 +23,8 @@ struct _FsearchFilterPreferencesWidget {
     GtkWidget *filter_edit_button;
     GtkWidget *filter_remove_button;
     GtkWidget *filter_reset_to_defaults_button;
+    GtkWidget *filter_move_up_button;
+    GtkWidget *filter_move_down_button;
 };
 
 enum { PROP_0, PROP_FILTER_MANAGER, NUM_PROPERTIES };
@@ -60,6 +62,36 @@ filter_get_selected(FsearchFilterPreferencesWidget *self) {
     g_assert(name);
 
     return fsearch_filter_manager_get_filter_for_name(self->filters, name);
+}
+
+// A GtkListStore refuses to swap rows while it's sorted by a column, so the
+// move buttons have to go insensitive as soon as the user clicks a header.
+static gboolean
+filter_list_is_sorted(FsearchFilterPreferencesWidget *self) {
+    gint sort_column_id = 0;
+    GtkSortType order = GTK_SORT_ASCENDING;
+    // Returns FALSE for the default and unsorted special ids, which is what we want
+    return gtk_tree_sortable_get_sort_column_id(GTK_TREE_SORTABLE(self->filter_model), &sort_column_id, &order);
+}
+
+static void
+filter_move_buttons_update(FsearchFilterPreferencesWidget *self) {
+    gboolean can_move_up = FALSE;
+    gboolean can_move_down = FALSE;
+
+    GtkTreeIter iter = {0};
+    GtkTreeModel *model = NULL;
+    if (!filter_list_is_sorted(self) && gtk_tree_selection_get_selected(self->filter_list_selection, &model, &iter)) {
+        GtkTreeIter sibling = iter;
+        can_move_down = gtk_tree_model_iter_next(model, &sibling);
+
+        GtkTreePath *path = gtk_tree_model_get_path(model, &iter);
+        can_move_up = gtk_tree_path_prev(path);
+        gtk_tree_path_free(path);
+    }
+
+    gtk_widget_set_sensitive(self->filter_move_up_button, can_move_up);
+    gtk_widget_set_sensitive(self->filter_move_down_button, can_move_down);
 }
 
 static void
@@ -124,6 +156,7 @@ on_filter_editor_add_finished(FsearchFilter *old_filter,
     fsearch_filter_manager_append_filter(self->filters, filter);
     filter_row_add(self->filter_model, filter);
     g_clear_pointer(&filter, fsearch_filter_unref);
+    filter_move_buttons_update(self);
 }
 
 static void
@@ -147,6 +180,7 @@ on_filter_remove_button_clicked(GtkButton *button, gpointer user_data) {
         g_clear_pointer(&filter, fsearch_filter_unref);
         gtk_tree_selection_selected_foreach(self->filter_list_selection, remove_list_store_row, NULL);
     }
+    filter_move_buttons_update(self);
 }
 
 static void
@@ -168,6 +202,50 @@ on_filter_reset_to_defaults_button_clicked(GtkButton *button, gpointer user_data
     self->filters = fsearch_filter_manager_new_with_defaults();
 
     filter_list_update(self->filter_model, self->filters);
+    filter_move_buttons_update(self);
+}
+
+static void
+filter_move_selected(FsearchFilterPreferencesWidget *self, gboolean up) {
+    GtkTreeIter iter = {0};
+    GtkTreeModel *model = NULL;
+    if (!gtk_tree_selection_get_selected(self->filter_list_selection, &model, &iter)) {
+        return;
+    }
+    if (filter_list_is_sorted(self)) {
+        return;
+    }
+
+    GtkTreeIter sibling = iter;
+    const gboolean has_sibling = up ? gtk_tree_model_iter_previous(model, &sibling)
+                                    : gtk_tree_model_iter_next(model, &sibling);
+    if (!has_sibling) {
+        return;
+    }
+
+    // This emits "rows-reordered", and on_filter_model_reordered() is what
+    // actually tells the filter manager about the new order. Swapping the model
+    // rows is the whole change; nothing else needs to touch self->filters.
+    gtk_list_store_swap(GTK_LIST_STORE(model), &iter, &sibling);
+
+    // Keep the row the user is moving selected and on screen, so the button can
+    // be clicked repeatedly to walk a filter up or down the list.
+    GtkTreePath *path = gtk_tree_model_get_path(model, &iter);
+    gtk_tree_selection_select_path(self->filter_list_selection, path);
+    gtk_tree_view_scroll_to_cell(self->filter_list, path, NULL, FALSE, 0, 0);
+    gtk_tree_path_free(path);
+
+    filter_move_buttons_update(self);
+}
+
+static void
+on_filter_move_up_button_clicked(GtkButton *button, gpointer user_data) {
+    filter_move_selected(FSEARCH_FILTER_PREFERENCES_WIDGET(user_data), TRUE);
+}
+
+static void
+on_filter_move_down_button_clicked(GtkButton *button, gpointer user_data) {
+    filter_move_selected(FSEARCH_FILTER_PREFERENCES_WIDGET(user_data), FALSE);
 }
 
 static void
@@ -200,6 +278,7 @@ on_filter_list_selection_changed(GtkTreeSelection *sel, gpointer user_data) {
     gboolean selected = gtk_tree_selection_get_selected(sel, NULL, NULL);
     gtk_widget_set_sensitive(GTK_WIDGET(self->filter_remove_button), selected);
     gtk_widget_set_sensitive(GTK_WIDGET(self->filter_edit_button), selected);
+    filter_move_buttons_update(self);
     return;
 }
 
@@ -294,11 +373,15 @@ fsearch_filter_preferences_widget_class_init(FsearchFilterPreferencesWidgetClass
     gtk_widget_class_bind_template_child(widget_class, FsearchFilterPreferencesWidget, filter_remove_button);
     gtk_widget_class_bind_template_child(widget_class, FsearchFilterPreferencesWidget, filter_edit_button);
     gtk_widget_class_bind_template_child(widget_class, FsearchFilterPreferencesWidget, filter_reset_to_defaults_button);
+    gtk_widget_class_bind_template_child(widget_class, FsearchFilterPreferencesWidget, filter_move_up_button);
+    gtk_widget_class_bind_template_child(widget_class, FsearchFilterPreferencesWidget, filter_move_down_button);
 
     gtk_widget_class_bind_template_callback(widget_class, on_filter_add_button_clicked);
     gtk_widget_class_bind_template_callback(widget_class, on_filter_remove_button_clicked);
     gtk_widget_class_bind_template_callback(widget_class, on_filter_edit_button_clicked);
     gtk_widget_class_bind_template_callback(widget_class, on_filter_reset_to_defaults_button_clicked);
+    gtk_widget_class_bind_template_callback(widget_class, on_filter_move_up_button_clicked);
+    gtk_widget_class_bind_template_callback(widget_class, on_filter_move_down_button_clicked);
     gtk_widget_class_bind_template_callback(widget_class, on_filter_list_row_activated);
     gtk_widget_class_bind_template_callback(widget_class, on_filter_list_selection_changed);
 }
@@ -315,6 +398,13 @@ fsearch_filter_preferences_widget_init(FsearchFilterPreferencesWidget *self) {
     column_text_append(self->filter_list, _("Name"), FALSE, COL_FILTER_NAME);
     column_text_append(self->filter_list, _("Macro"), TRUE, COL_FILTER_MACRO);
     column_text_append(self->filter_list, _("Query"), TRUE, COL_FILTER_QUERY);
+
+    // Sorting by a column makes the store refuse swaps, so re-evaluate the
+    // move buttons whenever the sort changes.
+    g_signal_connect_swapped(self->filter_model,
+                             "sort-column-changed",
+                             G_CALLBACK(filter_move_buttons_update),
+                             self);
 
     // Workaround for GTK bug: https://gitlab.gnome.org/GNOME/gtk/-/issues/3084
     g_signal_connect(self->filter_list, "realize", G_CALLBACK(gtk_tree_view_columns_autosize), NULL);

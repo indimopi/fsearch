@@ -467,6 +467,18 @@ fsearch_list_view_draw_list(GtkWidget *widget, GtkStyleContext *context, cairo_t
             cairo_save(cr);
             gdk_cairo_rectangle(cr, &row_rect);
             cairo_clip(cr);
+
+            // Alternating row shading. The class has to be added here rather
+            // than in the draw function, because the index the draw function
+            // receives is the sorted *data* index - striping has to follow the
+            // row's position on screen or it breaks as soon as you sort.
+            // Whether it is actually painted is left to shared.css, which skips
+            // selected rows so the selection colour always wins.
+            gtk_style_context_save(context);
+            if (row_idx % 2) {
+                gtk_style_context_add_class(context, "fsearch-row-alternate");
+            }
+
             view->draw_row_func(cr,
                                 view->bin_window,
                                 layout,
@@ -479,6 +491,7 @@ fsearch_list_view_draw_list(GtkWidget *widget, GtkStyleContext *context, cairo_t
                                 view->hovered_idx == row_idx ? TRUE : FALSE,
                                 fsearch_list_view_is_text_dir_rtl(view),
                                 view->draw_row_func_data);
+            gtk_style_context_restore(context);
             cairo_restore(cr);
         }
     }

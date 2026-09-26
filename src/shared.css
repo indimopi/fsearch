@@ -100,3 +100,18 @@
 .include_settings_frame border {
     border-left-width: 0;
 }
+/* Alternating row shading in the results list.
+ *
+ * FsearchListView draws its own rows, so this cannot be done with the usual
+ * :nth-child() - the list view tags every other visible row with this class
+ * instead. :not(:selected) keeps the selection colour on top; without it this
+ * rule and the theme's :selected rule have equal specificity and this one wins,
+ * because shared.css is loaded at PRIORITY_APPLICATION, above the theme.
+ *
+ * Derived from the theme's own foreground colour, so it lands the right way
+ * round in both light and dark themes. Override it in ~/.config/gtk-3.0/gtk.css
+ * (PRIORITY_USER, which beats this) to change the strength or switch it off.
+ */
+.fsearch-row-alternate:not(:selected) {
+    background-color: alpha(@theme_fg_color, 0.045);
+}

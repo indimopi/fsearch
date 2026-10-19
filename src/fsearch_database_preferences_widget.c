@@ -40,6 +40,13 @@ struct _FsearchDatabasePreferencesWidget {
     GtkBox *include_rescan_scheduled_box;
     GtkSpinButton *include_rescan_scheduled_hours_spinbutton;
     GtkSpinButton *include_rescan_scheduled_minutes_spinbutton;
+    // The row whose settings are shown next to the list. Edits go to this row rather than to whatever is
+    // selected at that moment, so a value committed while the selection changes (e.g. hours typed into the
+    // spin button, committed on focus-out) still lands on the row it was entered for.
+    GtkTreeRowReference *include_edit_row;
+    // Set while the settings widgets are filled in from a newly selected row, so their change handlers don't
+    // write those values back into the model
+    gboolean include_settings_updating;
 
     // Exclude model
     GtkTreeView *exclude_list;
@@ -717,6 +724,11 @@ static void
 on_include_selection_changed(GtkTreeSelection *selection, gpointer user_data) {
     FsearchDatabasePreferencesWidget *self = FSEARCH_DATABASE_PREFERENCES_WIDGET(user_data);
 
+    // Commit anything typed into the spin buttons to the row it was entered for, before switching rows
+    gtk_spin_button_update(self->include_rescan_scheduled_hours_spinbutton);
+    gtk_spin_button_update(self->include_rescan_scheduled_minutes_spinbutton);
+    g_clear_pointer(&self->include_edit_row, gtk_tree_row_reference_free);
+
     const gint num_selected_rows = gtk_tree_selection_count_selected_rows(selection);
 
     GtkWidget *include_remove_button = GTK_WIDGET(self->include_remove_button);
@@ -733,6 +745,10 @@ on_include_selection_changed(GtkTreeSelection *selection, gpointer user_data) {
     GtkTreeIter iter = {};
 
     if (gtk_tree_selection_get_selected(selection, &model, &iter)) {
+        GtkTreePath *path = gtk_tree_model_get_path(model, &iter);
+        self->include_edit_row = gtk_tree_row_reference_new(model, path);
+        gtk_tree_path_free(path);
+
         gboolean one_file_system = FALSE;
         gboolean monitor = FALSE;
         gboolean scan_after_launch = FALSE;
@@ -748,6 +764,7 @@ on_include_selection_changed(GtkTreeSelection *selection, gpointer user_data) {
                            COL_INCLUDE_RESCAN_AFTER,
                            &rescan_after,
                            -1);
+        self->include_settings_updating = TRUE;
         gtk_toggle_button_set_active(self->include_monitor_checkbutton, monitor);
         gtk_toggle_button_set_active(self->include_scan_after_launch_checkbutton, monitor ? TRUE : scan_after_launch);
         gtk_widget_set_sensitive(GTK_WIDGET(self->include_scan_after_launch_checkbutton), !monitor);
@@ -765,24 +782,38 @@ on_include_selection_changed(GtkTreeSelection *selection, gpointer user_data) {
         }
         gtk_spin_button_set_value(self->include_rescan_scheduled_hours_spinbutton, hours);
         gtk_spin_button_set_value(self->include_rescan_scheduled_minutes_spinbutton, minutes);
+        self->include_settings_updating = FALSE;
     }
 }
 
+static gboolean
+include_edit_row_get_iter(FsearchDatabasePreferencesWidget *self, GtkTreeIter *iter) {
+    if (!self->include_edit_row || !gtk_tree_row_reference_valid(self->include_edit_row)) {
+        return FALSE;
+    }
+    GtkTreePath *path = gtk_tree_row_reference_get_path(self->include_edit_row);
+    const gboolean res = gtk_tree_model_get_iter(GTK_TREE_MODEL(self->include_model), iter, path);
+    gtk_tree_path_free(path);
+    return res;
+}
+
 static void
-include_model_update_on_toggled_button(GtkTreeSelection *selection, GtkToggleButton *button, gint col) {
-    GtkTreeModel *model = NULL;
+include_model_update_on_toggled_button(FsearchDatabasePreferencesWidget *self, GtkToggleButton *button, gint col) {
     GtkTreeIter iter = {};
 
     const gboolean button_active = gtk_toggle_button_get_active(button);
-    if (gtk_tree_selection_get_selected(selection, &model, &iter)) {
-        gtk_list_store_set(GTK_LIST_STORE(model), &iter, col, button_active, -1);
+    if (include_edit_row_get_iter(self, &iter)) {
+        gtk_list_store_set(self->include_model, &iter, col, button_active, -1);
     }
 }
 
 static void
 on_include_monitor_checkbutton_toggled(GtkToggleButton *button, gpointer user_data) {
     FsearchDatabasePreferencesWidget *self = FSEARCH_DATABASE_PREFERENCES_WIDGET(user_data);
-    include_model_update_on_toggled_button(self->include_selection, button, COL_INCLUDE_MONITOR);
+    if (self->include_settings_updating) {
+        return;
+    }
+    include_model_update_on_toggled_button(self, button, COL_INCLUDE_MONITOR);
     const gboolean monitor = gtk_toggle_button_get_active(button);
     if (monitor) {
         gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(self->include_scan_after_launch_checkbutton), monitor);
@@ -793,22 +824,30 @@ on_include_monitor_checkbutton_toggled(GtkToggleButton *button, gpointer user_da
 static void
 on_include_scan_after_launch_checkbutton_toggled(GtkToggleButton *button, gpointer user_data) {
     FsearchDatabasePreferencesWidget *self = FSEARCH_DATABASE_PREFERENCES_WIDGET(user_data);
-    include_model_update_on_toggled_button(self->include_selection, button, COL_INCLUDE_SCAN_AFTER_LAUNCH);
+    if (self->include_settings_updating) {
+        return;
+    }
+    include_model_update_on_toggled_button(self, button, COL_INCLUDE_SCAN_AFTER_LAUNCH);
 }
 
 static void
 on_include_onefs_checkbutton_toggled(GtkToggleButton *button, gpointer user_data) {
     FsearchDatabasePreferencesWidget *self = FSEARCH_DATABASE_PREFERENCES_WIDGET(user_data);
-    include_model_update_on_toggled_button(self->include_selection, button, COL_INCLUDE_ONE_FS);
+    if (self->include_settings_updating) {
+        return;
+    }
+    include_model_update_on_toggled_button(self, button, COL_INCLUDE_ONE_FS);
 }
 
 static void
 include_model_update_rescan_after(FsearchDatabasePreferencesWidget *self) {
+    if (self->include_settings_updating) {
+        return;
+    }
 
-    GtkTreeModel *model = NULL;
     GtkTreeIter iter = {};
 
-    if (gtk_tree_selection_get_selected(self->include_selection, &model, &iter)) {
+    if (include_edit_row_get_iter(self, &iter)) {
         const gboolean button_active = gtk_toggle_button_get_active(self->include_rescan_scheduled_checkbutton);
         gint64 seconds = 0;
         if (button_active) {
@@ -817,17 +856,27 @@ include_model_update_rescan_after(FsearchDatabasePreferencesWidget *self) {
             seconds = hours * 3600 + minutes * 60;
         }
 
-        gtk_list_store_set(GTK_LIST_STORE(model), &iter, COL_INCLUDE_RESCAN_AFTER, seconds, -1);
+        gtk_list_store_set(self->include_model, &iter, COL_INCLUDE_RESCAN_AFTER, seconds, -1);
     }
 }
 
 static void
 on_include_rescan_scheduled_checkbutton_toggled(GtkToggleButton *button, gpointer user_data) {
     FsearchDatabasePreferencesWidget *self = FSEARCH_DATABASE_PREFERENCES_WIDGET(user_data);
+    if (self->include_settings_updating) {
+        return;
+    }
+
+    const gboolean button_active = gtk_toggle_button_get_active(button);
+    if (button_active && gtk_spin_button_get_value_as_int(self->include_rescan_scheduled_hours_spinbutton) == 0
+        && gtk_spin_button_get_value_as_int(self->include_rescan_scheduled_minutes_spinbutton) == 0) {
+        // An interval of 0 means "never", so ticking the box without picking an interval would silently turn it
+        // off again on save. Start with a sensible default instead.
+        gtk_spin_button_set_value(self->include_rescan_scheduled_hours_spinbutton, 24);
+    }
 
     include_model_update_rescan_after(self);
 
-    const gboolean button_active = gtk_toggle_button_get_active(button);
     gtk_widget_set_sensitive(GTK_WIDGET(self->include_rescan_scheduled_box), button_active);
 }
 
@@ -952,6 +1001,7 @@ static void
 fsearch_database_preferences_widget_dispose(GObject *object) {
     FsearchDatabasePreferencesWidget *self = FSEARCH_DATABASE_PREFERENCES_WIDGET(object);
 
+    g_clear_pointer(&self->include_edit_row, gtk_tree_row_reference_free);
     g_clear_object(&self->include_manager);
     g_clear_object(&self->exclude_manager);
     g_clear_object(&self->exclude_type_model);

@@ -195,6 +195,7 @@ set_background_hold(FsearchApplication *self, bool hold) {
         return;
     }
     self->background_hold = hold;
+    g_info("[app] keep running in background: %s", hold ? "on" : "off");
     if (hold) {
         g_application_hold(G_APPLICATION(self));
     }
@@ -422,6 +423,7 @@ on_database_scan_started(FsearchDatabase *db, gpointer user_data) {
     FsearchApplication *self = (FsearchApplication *)user_data;
     g_assert(FSEARCH_IS_APPLICATION(self));
     self->db_state = FSEARCH_DATABASE_STATE_SCANNING;
+    g_info("[app] database scan started");
 }
 
 static void
@@ -429,6 +431,7 @@ on_database_load_started(FsearchDatabase *db, gpointer user_data) {
     FsearchApplication *self = (FsearchApplication *)user_data;
     g_assert(FSEARCH_IS_APPLICATION(self));
     self->db_state = FSEARCH_DATABASE_STATE_LOADING;
+    g_info("[app] loading database");
 }
 
 static void
@@ -438,6 +441,7 @@ on_database_update_finished(FsearchDatabase *db, FsearchDatabaseInfo *info, gpoi
     self->num_files = fsearch_database_info_get_num_files(info);
     self->num_folders = fsearch_database_info_get_num_folders(info);
     self->db_state = FSEARCH_DATABASE_STATE_IDLE;
+    g_info("[app] database ready: %u files, %u folders", self->num_files, self->num_folders);
 }
 
 static void
@@ -689,6 +693,7 @@ fsearch_application_command_line(GApplication *app, GApplicationCommandLine *cmd
 
     if (g_variant_dict_contains(dict, "background")) {
         // Keep running without a window and bring the index up to date, so it's ready once the window is opened
+        g_info("[app] started in background, queuing full database update");
         self->started_in_background = true;
         update_background_hold(self);
         g_action_group_activate_action(G_ACTION_GROUP(self), "update_database", NULL);

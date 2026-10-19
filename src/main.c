@@ -21,6 +21,7 @@
 #endif
 
 #include "fsearch.h"
+#include "fsearch_log.h"
 #include <glib/gi18n.h>
 #include <gtk/gtk.h>
 #include <locale.h>
@@ -34,6 +35,8 @@ main(int argc, char *argv[]) {
 
     g_set_application_name(_("FSearch"));
     g_set_prgname("io.github.cboxdoerfer.FSearch");
+
+    fsearch_log_init();
 
     return g_application_run(G_APPLICATION(fsearch_application_new()), argc, argv);
 }

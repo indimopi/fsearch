@@ -44,6 +44,7 @@ libfsearch_sources = [
     'fsearch_folder_monitor_event.c',
     'fsearch_list_view.c',
     'fsearch_listview_popup.c',
+    'fsearch_log.c',
     'fsearch_main_context_utils.c',
     'fsearch_preferences_dialog.c',
     'fsearch_query.c',

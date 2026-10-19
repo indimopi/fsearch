@@ -47,6 +47,10 @@ struct _FsearchDatabase {
 
     GThreadPool *io_pool;
 
+    // Number of full rescans waiting in the work queue. If one is pending when the database finishes
+    // loading, the per-folder startup scans are skipped, since the full rescan covers them anyway.
+    gint num_full_rescans_queued;
+
     GCancellable *cancellable;
 
     // Cancellable of the most recently queued scan
@@ -699,6 +703,7 @@ database_rescan(FsearchDatabase *self, FsearchDatabaseWork *work) {
     // DB must be locked
     g_return_if_fail(self);
     g_return_if_fail(work);
+    g_atomic_int_dec_and_test(&self->num_full_rescans_queued);
     g_return_if_fail(self->store || self->pending_store);
 
     // Shutting down: don't push a scan the io pool would have to finish before it can be freed
@@ -916,6 +921,9 @@ database_load(FsearchDatabase *self) {
     if (self->rescan_manager) {
         if (!res) {
             fsearch_database_rescan_manager_request_full_scan(self->rescan_manager);
+        }
+        else if (g_atomic_int_get(&self->num_full_rescans_queued) > 0) {
+            g_info("[db_load] full rescan already queued, skipping per-folder startup scans");
         }
         else {
             fsearch_database_rescan_manager_trigger_startup_scans(self->rescan_manager);
@@ -1366,6 +1374,9 @@ fsearch_database_queue_work(FsearchDatabase *self, FsearchDatabaseWork *work) {
     // Publish scan cancellables at queue time, so cancel_scan() also reaches scans still waiting
     // in the work queue.
     const FsearchDatabaseWorkKind kind = fsearch_database_work_get_kind(work);
+    if (kind == FSEARCH_DATABASE_WORK_RESCAN) {
+        g_atomic_int_inc(&self->num_full_rescans_queued);
+    }
     if (kind == FSEARCH_DATABASE_WORK_SCAN || kind == FSEARCH_DATABASE_WORK_RESCAN
         || kind == FSEARCH_DATABASE_WORK_RESCAN_INDEX) {
         g_autoptr(GCancellable) cancellable = fsearch_database_work_get_cancellable(work);

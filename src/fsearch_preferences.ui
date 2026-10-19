@@ -155,6 +155,25 @@
                               </packing>
                             </child>
                             <child>
+                              <object class="GtkCheckButton" id="restore_win_position_button">
+                                <property name="label" translatable="yes">Remember window position</property>
+                                <property name="visible">True</property>
+                                <property name="can-focus">True</property>
+                                <property name="receives-default">False</property>
+                                <property name="has-tooltip">False</property>
+                                <property name="draw-indicator">True</property>
+                                  <signal name="focus-out-event" handler="on_help_reset"
+                                          object="FsearchPreferencesDialog" swapped="no"/>
+                                  <signal name="leave-notify-event" handler="on_help_reset"
+                                          object="FsearchPreferencesDialog" swapped="no"/>
+                              </object>
+                              <packing>
+                                <property name="expand">False</property>
+                                <property name="fill">True</property>
+                                <property name="position">4</property>
+                              </packing>
+                            </child>
+                            <child>
                               <object class="GtkCheckButton" id="exit_on_escape_button">
                                 <property name="label" translatable="yes">Exit on Escape</property>
                                 <property name="visible">True</property>
@@ -172,7 +191,7 @@
                               <packing>
                                 <property name="expand">False</property>
                                 <property name="fill">True</property>
-                                <property name="position">4</property>
+                                <property name="position">5</property>
                               </packing>
                             </child>
                             <child>
@@ -193,7 +212,7 @@
                               <packing>
                                 <property name="expand">False</property>
                                 <property name="fill">True</property>
-                                <property name="position">5</property>
+                                <property name="position">6</property>
                               </packing>
                             </child>
                             <child>
@@ -316,7 +335,7 @@
                               <packing>
                                 <property name="expand">False</property>
                                 <property name="fill">True</property>
-                                <property name="position">6</property>
+                                <property name="position">7</property>
                               </packing>
                             </child>
                           </object>

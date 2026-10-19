@@ -61,6 +61,9 @@ struct _FsearchConfig {
     bool restore_window_size;
     int32_t window_width;
     int32_t window_height;
+    bool restore_window_position;
+    int32_t window_x;
+    int32_t window_y;
 
     // Interface
     bool show_base_2_units;

@@ -97,6 +97,9 @@ static const FsearchKeyData WINDOW_SECTION[] = {
     CONF_BOOL(restore_window_size, true),
     CONF_INT(window_width, 850),
     CONF_INT(window_height, 600),
+    CONF_BOOL(restore_window_position, true),
+    CONF_INT(window_x, -1),
+    CONF_INT(window_y, -1),
 };
 
 static const FsearchKeyData APPLICATIONS_SECTION[] = {

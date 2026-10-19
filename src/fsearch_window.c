@@ -330,6 +330,27 @@ apply_filter_config(FsearchApplicationWindow *win) {
     perform_search(win);
 }
 
+// Only restore a saved position if it's still on one of the connected monitors, so the window doesn't open
+// off-screen after a monitor was unplugged or the layout changed
+static gboolean
+window_position_is_on_screen(FsearchApplicationWindow *self, gint x, gint y) {
+    if (x < 0 || y < 0) {
+        return FALSE;
+    }
+    GdkDisplay *display = gtk_widget_get_display(GTK_WIDGET(self));
+    const int num_monitors = gdk_display_get_n_monitors(display);
+    for (int i = 0; i < num_monitors; i++) {
+        GdkRectangle geometry = {};
+        gdk_monitor_get_geometry(gdk_display_get_monitor(display, i), &geometry);
+        // Require the top left corner (where the title bar is) to be visible with some margin
+        if (x >= geometry.x && x < geometry.x + geometry.width - 50 && y >= geometry.y
+            && y < geometry.y + geometry.height - 50) {
+            return TRUE;
+        }
+    }
+    return FALSE;
+}
+
 static void
 fsearch_window_apply_config(FsearchApplicationWindow *self) {
     g_assert(FSEARCH_IS_APPLICATION_WINDOW(self));
@@ -338,6 +359,9 @@ fsearch_window_apply_config(FsearchApplicationWindow *self) {
 
     if (config->restore_window_size) {
         gtk_window_set_default_size(GTK_WINDOW(self), config->window_width, config->window_height);
+    }
+    if (config->restore_window_position && window_position_is_on_screen(self, config->window_x, config->window_y)) {
+        gtk_window_move(GTK_WINDOW(self), config->window_x, config->window_y);
     }
     fsearch_application_window_apply_search_revealer_config(self);
     fsearch_application_window_apply_statusbar_revealer_config(self);
@@ -1097,6 +1121,9 @@ static gboolean
 on_fsearch_window_delete_event(GtkWidget *widget, GdkEvent *event, gpointer user_data) {
     FsearchApplicationWindow *win = FSEARCH_APPLICATION_WINDOW(widget);
     fsearch_application_window_prepare_shutdown(win);
+    // When running in the background the application keeps going after the window is closed, so write the
+    // window state now instead of only on exit
+    config_save(fsearch_application_get_config(FSEARCH_APPLICATION_DEFAULT));
     g_clear_pointer(&widget, gtk_widget_destroy);
     return TRUE;
 }
@@ -1252,6 +1279,14 @@ fsearch_application_window_prepare_shutdown(gpointer self) {
     gtk_window_get_size(GTK_WINDOW(self), &width, &height);
     config->window_width = width;
     config->window_height = height;
+
+    if (gtk_widget_get_visible(GTK_WIDGET(self))) {
+        gint x = -1;
+        gint y = -1;
+        gtk_window_get_position(GTK_WINDOW(self), &x, &y);
+        config->window_x = x;
+        config->window_y = y;
+    }
 
     if (win->result_view && win->result_view->list_view) {
         FsearchListView *list_view = win->result_view->list_view;

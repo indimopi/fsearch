@@ -35,6 +35,7 @@ struct _FsearchPreferencesDialog {
     GtkToggleButton *show_menubar_button;
     GtkToggleButton *show_tooltips_button;
     GtkToggleButton *restore_win_size_button;
+    GtkToggleButton *restore_win_position_button;
     GtkToggleButton *exit_on_escape_button;
     GtkToggleButton *run_in_background_button;
     GtkToggleButton *restore_sort_order_button;
@@ -132,6 +133,7 @@ update_config(FsearchPreferencesDialog *self) {
     self->config->show_menubar = !gtk_toggle_button_get_active(self->show_menubar_button);
     self->config->enable_list_tooltips = gtk_toggle_button_get_active(self->show_tooltips_button);
     self->config->restore_window_size = gtk_toggle_button_get_active(self->restore_win_size_button);
+    self->config->restore_window_position = gtk_toggle_button_get_active(self->restore_win_position_button);
     self->config->restore_column_config = gtk_toggle_button_get_active(self->restore_column_config_button);
     self->config->restore_sort_order = gtk_toggle_button_get_active(self->restore_sort_order_button);
     self->config->exit_on_escape = gtk_toggle_button_get_active(self->exit_on_escape_button);
@@ -245,6 +247,7 @@ fsearch_preferences_dialog_constructed(GObject *object) {
     gtk_toggle_button_set_active(self->show_menubar_button, !self->config_old->show_menubar);
     gtk_toggle_button_set_active(self->show_tooltips_button, self->config_old->enable_list_tooltips);
     gtk_toggle_button_set_active(self->restore_win_size_button, self->config_old->restore_window_size);
+    gtk_toggle_button_set_active(self->restore_win_position_button, self->config_old->restore_window_position);
     gtk_toggle_button_set_active(self->restore_column_config_button, self->config_old->restore_column_config);
     gtk_toggle_button_set_active(self->restore_sort_order_button, self->config_old->restore_sort_order);
     gtk_toggle_button_set_active(self->exit_on_escape_button, self->config_old->exit_on_escape);
@@ -300,6 +303,7 @@ fsearch_preferences_dialog_class_init(FsearchPreferencesDialogClass *klass) {
     gtk_widget_class_bind_template_child(widget_class, FsearchPreferencesDialog, show_menubar_button);
     gtk_widget_class_bind_template_child(widget_class, FsearchPreferencesDialog, show_tooltips_button);
     gtk_widget_class_bind_template_child(widget_class, FsearchPreferencesDialog, restore_win_size_button);
+    gtk_widget_class_bind_template_child(widget_class, FsearchPreferencesDialog, restore_win_position_button);
     gtk_widget_class_bind_template_child(widget_class, FsearchPreferencesDialog, exit_on_escape_button);
     gtk_widget_class_bind_template_child(widget_class, FsearchPreferencesDialog, run_in_background_button);
     gtk_widget_class_bind_template_child(widget_class, FsearchPreferencesDialog, restore_sort_order_button);

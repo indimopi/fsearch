@@ -117,6 +117,7 @@ static const FsearchKeyData INTERFACE_SECTION[] = {
     CONF_BOOL(action_after_file_open_mouse, false),
     CONF_INT(action_after_file_open, ACTION_AFTER_OPEN_NOTHING),
     CONF_BOOL(exit_on_escape, false),
+    CONF_BOOL(run_in_background, false),
     CONF_BOOL(show_indexing_status, true),
     CONF_BOOL(show_menubar, true),
     CONF_BOOL(show_statusbar, true),

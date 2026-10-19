@@ -36,6 +36,7 @@ struct _FsearchPreferencesDialog {
     GtkToggleButton *show_tooltips_button;
     GtkToggleButton *restore_win_size_button;
     GtkToggleButton *exit_on_escape_button;
+    GtkToggleButton *run_in_background_button;
     GtkToggleButton *restore_sort_order_button;
     GtkToggleButton *restore_column_config_button;
     GtkToggleButton *double_click_path_button;
@@ -134,6 +135,7 @@ update_config(FsearchPreferencesDialog *self) {
     self->config->restore_column_config = gtk_toggle_button_get_active(self->restore_column_config_button);
     self->config->restore_sort_order = gtk_toggle_button_get_active(self->restore_sort_order_button);
     self->config->exit_on_escape = gtk_toggle_button_get_active(self->exit_on_escape_button);
+    self->config->run_in_background = gtk_toggle_button_get_active(self->run_in_background_button);
     self->config->double_click_path = gtk_toggle_button_get_active(self->double_click_path_button);
     self->config->single_click_open = gtk_toggle_button_get_active(self->single_click_open_button);
     self->config->launch_desktop_files = gtk_toggle_button_get_active(self->launch_desktop_files_button);
@@ -246,6 +248,7 @@ fsearch_preferences_dialog_constructed(GObject *object) {
     gtk_toggle_button_set_active(self->restore_column_config_button, self->config_old->restore_column_config);
     gtk_toggle_button_set_active(self->restore_sort_order_button, self->config_old->restore_sort_order);
     gtk_toggle_button_set_active(self->exit_on_escape_button, self->config_old->exit_on_escape);
+    gtk_toggle_button_set_active(self->run_in_background_button, self->config_old->run_in_background);
     gtk_toggle_button_set_active(self->double_click_path_button, self->config_old->double_click_path);
     gtk_toggle_button_set_active(self->single_click_open_button, self->config_old->single_click_open);
     gtk_toggle_button_set_active(self->launch_desktop_files_button, self->config_old->launch_desktop_files);
@@ -298,6 +301,7 @@ fsearch_preferences_dialog_class_init(FsearchPreferencesDialogClass *klass) {
     gtk_widget_class_bind_template_child(widget_class, FsearchPreferencesDialog, show_tooltips_button);
     gtk_widget_class_bind_template_child(widget_class, FsearchPreferencesDialog, restore_win_size_button);
     gtk_widget_class_bind_template_child(widget_class, FsearchPreferencesDialog, exit_on_escape_button);
+    gtk_widget_class_bind_template_child(widget_class, FsearchPreferencesDialog, run_in_background_button);
     gtk_widget_class_bind_template_child(widget_class, FsearchPreferencesDialog, restore_sort_order_button);
     gtk_widget_class_bind_template_child(widget_class, FsearchPreferencesDialog, restore_column_config_button);
     gtk_widget_class_bind_template_child(widget_class, FsearchPreferencesDialog, double_click_path_button);

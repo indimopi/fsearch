@@ -57,6 +57,11 @@ struct _FsearchApplication {
     bool new_window;
     bool minimized;
 
+    // Set when launched with --background, keeps the application alive regardless of the config
+    bool started_in_background;
+    // Whether we currently hold the application, so it keeps running without any open window
+    bool background_hold;
+
     guint file_manager_watch_id;
     bool has_file_manager_on_bus;
 
@@ -185,6 +190,25 @@ action_about_activated(GSimpleAction *action, GVariant *parameter, gpointer app)
 }
 
 static void
+set_background_hold(FsearchApplication *self, bool hold) {
+    if (hold == self->background_hold) {
+        return;
+    }
+    self->background_hold = hold;
+    if (hold) {
+        g_application_hold(G_APPLICATION(self));
+    }
+    else {
+        g_application_release(G_APPLICATION(self));
+    }
+}
+
+static void
+update_background_hold(FsearchApplication *self) {
+    set_background_hold(self, self->started_in_background || (self->config && self->config->run_in_background));
+}
+
+static void
 action_quit_activated(GSimpleAction *action, GVariant *parameter, gpointer app) {
     // Close all open windows. This ensures that all refernces to the database will be dropped and the database
     // is properly finalized.
@@ -192,6 +216,10 @@ action_quit_activated(GSimpleAction *action, GVariant *parameter, gpointer app) 
     for (GList *l = windows; l != NULL; l = l->next) {
         gtk_window_close(GTK_WINDOW(l->data));
     }
+    // Quit really quits, even when we're configured to keep running in the background
+    FsearchApplication *self = FSEARCH_APPLICATION(app);
+    self->started_in_background = false;
+    set_background_hold(self, false);
 }
 
 static void
@@ -208,6 +236,7 @@ on_preferences_dialog_response(GtkDialog *dialog, gint response_id, gpointer use
         }
         self->config = new_config;
         config_save(self->config);
+        update_background_hold(self);
 
         if (config_diff.database_config_changed) {
             fsearch_database_cancel_scan(self->db);
@@ -452,6 +481,7 @@ fsearch_application_startup(GApplication *app) {
     if (!config_load(self->config)) {
         config_load_default(self->config);
     }
+    update_background_hold(self);
 
     g_autofree char *db_file_path = g_build_filename(g_get_user_data_dir(), "fsearch", "fsearch.db", NULL);
     g_autoptr(GFile) db_file = g_file_new_for_path(db_file_path);
@@ -657,6 +687,16 @@ fsearch_application_command_line(GApplication *app, GApplicationCommandLine *cmd
         return 0;
     }
 
+    if (g_variant_dict_contains(dict, "background")) {
+        // Keep running without a window and bring the index up to date, so it's ready once the window is opened
+        self->started_in_background = true;
+        update_background_hold(self);
+        g_action_group_activate_action(G_ACTION_GROUP(self), "update_database", NULL);
+        self->new_window = false;
+        self->minimized = false;
+        return 0;
+    }
+
     const gchar *search_term = NULL;
     if (g_variant_dict_lookup(dict, "search", "&s", &search_term)) {
         g_clear_pointer(&self->option_search_term, g_free);
@@ -806,6 +846,7 @@ fsearch_application_add_option_entries(FsearchApplication *self) {
     static const GOptionEntry main_entries[] = {
         {"new-window", 0, 0, G_OPTION_ARG_NONE, NULL, N_("Open a new application window")},
         {"minimized", 0, 0, G_OPTION_ARG_NONE, NULL, N_("Minimize the application window")},
+        {"background", 0, 0, G_OPTION_ARG_NONE, NULL, N_("Run in the background without opening a window and update the database")},
         {"preferences", 0, 0, G_OPTION_ARG_NONE, NULL, N_("Show the application preferences")},
         {"search", 's', 0, G_OPTION_ARG_STRING, NULL, N_("Set the search pattern"), "PATTERN"},
         {"update-database", 'u', 0, G_OPTION_ARG_NONE, NULL, N_("Update the database and exit")},

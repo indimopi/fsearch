@@ -176,6 +176,27 @@
                               </packing>
                             </child>
                             <child>
+                              <object class="GtkCheckButton" id="run_in_background_button">
+                                <property name="label" translatable="yes">Keep running in the background</property>
+                                <property name="visible">True</property>
+                                <property name="can-focus">True</property>
+                                <property name="receives-default">False</property>
+                                <property name="has-tooltip">True</property>
+                                <property name="draw-indicator">True</property>
+                                  <signal name="focus-out-event" handler="on_help_reset"
+                                          object="FsearchPreferencesDialog" swapped="no"/>
+                                  <signal name="leave-notify-event" handler="on_help_reset"
+                                          object="FsearchPreferencesDialog" swapped="no"/>
+                                  <signal name="query-tooltip" handler="on_help_show" object="help_run_in_background"
+                                          swapped="no"/>
+                              </object>
+                              <packing>
+                                <property name="expand">False</property>
+                                <property name="fill">True</property>
+                                <property name="position">5</property>
+                              </packing>
+                            </child>
+                            <child>
                               <object class="GtkFrame" id="action_after_file_open_frame">
                                 <property name="visible">True</property>
                                 <property name="can-focus">False</property>
@@ -295,7 +316,7 @@
                               <packing>
                                 <property name="expand">False</property>
                                 <property name="fill">True</property>
-                                <property name="position">5</property>
+                                <property name="position">6</property>
                               </packing>
                             </child>
                           </object>
@@ -1607,6 +1628,24 @@ If enabled, FSearch exits when the Escape key is pressed instead of the window b
                     <property name="name">page35</property>
                     <property name="title">page35</property>
                     <property name="position">35</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkLabel" id="help_run_in_background">
+                    <property name="visible">True</property>
+                    <property name="can-focus">False</property>
+                    <property name="label" translatable="yes">&lt;b&gt;Keep running in the background:&lt;/b&gt;
+
+If enabled, closing the window keeps FSearch running in the background, so the database stays loaded and scheduled rescans keep running. Use Quit (Ctrl+Q) to exit completely.
+
+To start FSearch in the background at login, add &lt;tt&gt;fsearch --background&lt;/tt&gt; to your startup applications.</property>
+                    <property name="use-markup">True</property>
+                    <property name="wrap">True</property>
+                    <property name="selectable">True</property>
+                  </object>
+                  <packing>
+                    <property name="name">page_run_in_background</property>
+                    <property name="title">page_run_in_background</property>
                   </packing>
                 </child>
               </object>

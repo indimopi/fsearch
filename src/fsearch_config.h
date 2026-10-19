@@ -76,6 +76,7 @@ struct _FsearchConfig {
     bool action_after_file_open_keyboard;
     bool action_after_file_open_mouse;
     bool exit_on_escape;
+    bool run_in_background;
     bool show_indexing_status;
 
     // Warning Dialogs

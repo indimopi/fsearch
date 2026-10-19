@@ -607,6 +607,10 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
                         <property name="can-focus">False</property>
                         <property name="tooltip-text" translatable="yes">Select a Filter</property>
                         <property name="active">0</property>
+                        <!-- A wrap width makes GTK open the list below the box instead of on top of it, with the
+                             active filter under the pointer. Otherwise the slightest mouse movement during the click
+                             turns the button release into "select the item under the pointer", closing the list. -->
+                        <property name="wrap-width">1</property>
                         <signal name="changed" handler="on_filter_combobox_changed" object="FsearchApplicationWindow" swapped="no"/>
                         <style>
                           <class name="filter_combobox"/>

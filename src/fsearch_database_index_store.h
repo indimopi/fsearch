@@ -74,6 +74,16 @@ fsearch_database_index_store_start_monitoring(FsearchDatabaseIndexStore *store);
 bool
 fsearch_database_index_store_is_running(FsearchDatabaseIndexStore *store);
 
+// Creates a new (not yet scanned) index for `include`, using the exclude manager and flags of the store.
+// Used to rescan a single include with changed settings, without rebuilding the whole store.
+FsearchDatabaseIndex *
+fsearch_database_index_store_create_index_for_include(FsearchDatabaseIndexStore *store,
+                                                      FsearchDatabaseInclude *include);
+
+void
+fsearch_database_index_store_set_include_manager(FsearchDatabaseIndexStore *store,
+                                                 FsearchDatabaseIncludeManager *include_manager);
+
 FsearchDatabaseIndex *
 fsearch_database_index_store_create_index_for_rescan(FsearchDatabaseIndexStore *store, const char *path);
 

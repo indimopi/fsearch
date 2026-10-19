@@ -1028,6 +1028,35 @@ fsearch_database_index_store_start_monitoring(FsearchDatabaseIndexStore *store) 
 }
 
 FsearchDatabaseIndex *
+fsearch_database_index_store_create_index_for_include(FsearchDatabaseIndexStore *store,
+                                                      FsearchDatabaseInclude *include) {
+    g_return_val_if_fail(store, NULL);
+    g_return_val_if_fail(include, NULL);
+
+    g_autoptr(GMutexLocker) locker = g_mutex_locker_new(&store->mutex);
+    g_assert_nonnull(locker);
+
+    return fsearch_database_index_new(include,
+                                      store->exclude_manager,
+                                      store->flags,
+                                      store->monitor.ctx,
+                                      index_store_index_event_cb,
+                                      store);
+}
+
+void
+fsearch_database_index_store_set_include_manager(FsearchDatabaseIndexStore *store,
+                                                 FsearchDatabaseIncludeManager *include_manager) {
+    g_return_if_fail(store);
+    g_return_if_fail(include_manager);
+
+    g_autoptr(GMutexLocker) locker = g_mutex_locker_new(&store->mutex);
+    g_assert_nonnull(locker);
+
+    g_set_object(&store->include_manager, include_manager);
+}
+
+FsearchDatabaseIndex *
 fsearch_database_index_store_create_index_for_rescan(FsearchDatabaseIndexStore *store, const char *path) {
     g_return_val_if_fail(store, NULL);
 

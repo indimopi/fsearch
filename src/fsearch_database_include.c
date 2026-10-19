@@ -128,6 +128,18 @@ fsearch_database_include_set_last_scan_time(FsearchDatabaseInclude *self, int64_
 }
 
 void
+fsearch_database_include_set_rescan_after(FsearchDatabaseInclude *self, int64_t rescan_after) {
+    g_return_if_fail(self);
+    self->rescan_after = rescan_after;
+}
+
+void
+fsearch_database_include_set_scan_after_launch(FsearchDatabaseInclude *self, gboolean scan_after_launch) {
+    g_return_if_fail(self);
+    self->scan_after_launch = scan_after_launch;
+}
+
+void
 fsearch_database_include_set_last_scan_duration(FsearchDatabaseInclude *self, uint32_t duration) {
     g_return_if_fail(self);
     self->last_scan_duration = duration;

@@ -71,6 +71,12 @@ void
 fsearch_database_include_set_last_scan_time(FsearchDatabaseInclude *self, int64_t time);
 
 void
+fsearch_database_include_set_rescan_after(FsearchDatabaseInclude *self, int64_t rescan_after);
+
+void
+fsearch_database_include_set_scan_after_launch(FsearchDatabaseInclude *self, gboolean scan_after_launch);
+
+void
 fsearch_database_include_set_last_scan_duration(FsearchDatabaseInclude *self, uint32_t duration);
 
 void

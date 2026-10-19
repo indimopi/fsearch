@@ -828,6 +828,107 @@ database_rescan_index_finished(FsearchDatabase *self, FsearchDatabaseWork *work)
                 NULL);
 }
 
+// Applies a new configuration in which only per-folder settings changed (same folders, same excludes, same index
+// flags) without rebuilding the whole database: folders whose scan relevant settings (monitoring, one file system)
+// changed get rescanned on their own, all other folders keep their index and just pick up the new settings (e.g. the
+// rescan schedule). Returns false if the change needs a full scan.
+static bool
+database_apply_include_settings(FsearchDatabase *self,
+                                FsearchDatabaseWork *work,
+                                FsearchDatabaseIncludeManager *new_include_manager,
+                                FsearchDatabaseExcludeManager *new_exclude_manager,
+                                FsearchDatabaseIndexPropertyFlags flags) {
+    if (!self->store || fsearch_database_index_store_get_flags(self->store) != flags) {
+        return false;
+    }
+
+    g_autoptr(FsearchDatabaseExcludeManager) exclude_manager = database_get_exclude_manager(self);
+    g_autoptr(FsearchDatabaseIncludeManager) include_manager = database_get_include_manager(self);
+    if (!exclude_manager || !include_manager
+        || !fsearch_database_exclude_manager_equal(exclude_manager, new_exclude_manager)) {
+        return false;
+    }
+
+    g_autoptr(GPtrArray) includes = fsearch_database_include_manager_get_includes(include_manager);
+    g_autoptr(GPtrArray) new_includes = fsearch_database_include_manager_get_includes(new_include_manager);
+    if (includes->len != new_includes->len) {
+        return false;
+    }
+    // Both managers keep their includes sorted, so the same folders end up at the same positions
+    for (uint32_t i = 0; i < includes->len; i++) {
+        FsearchDatabaseInclude *include = g_ptr_array_index(includes, i);
+        FsearchDatabaseInclude *new_include = g_ptr_array_index(new_includes, i);
+        if (g_strcmp0(fsearch_database_include_get_path(include), fsearch_database_include_get_path(new_include)) != 0
+            || fsearch_database_include_get_active(include) != fsearch_database_include_get_active(new_include)) {
+            return false;
+        }
+    }
+
+    g_autoptr(FsearchDatabaseIncludeManager) merged_include_manager = fsearch_database_include_manager_new();
+    g_autoptr(GPtrArray) includes_to_rescan = g_ptr_array_new_with_free_func(
+        (GDestroyNotify)fsearch_database_include_unref);
+
+    for (uint32_t i = 0; i < includes->len; i++) {
+        FsearchDatabaseInclude *include = g_ptr_array_index(includes, i);
+        FsearchDatabaseInclude *new_include = g_ptr_array_index(new_includes, i);
+
+        const bool active = fsearch_database_include_get_active(include);
+        const bool scan_settings_changed = fsearch_database_include_get_monitored(include)
+                                            != fsearch_database_include_get_monitored(new_include)
+                                        || fsearch_database_include_get_one_file_system(include)
+                                               != fsearch_database_include_get_one_file_system(new_include);
+
+        if (!active || scan_settings_changed) {
+            // Inactive folders have no index, so their include can simply be replaced. Active ones with changed scan
+            // settings get a new index, built from the new include.
+            g_autoptr(FsearchDatabaseInclude) include_copy = fsearch_database_include_copy(new_include);
+            fsearch_database_include_set_last_scan_time(include_copy,
+                                                        fsearch_database_include_get_last_scan_time(include));
+            fsearch_database_include_manager_add(merged_include_manager, include_copy);
+            if (active) {
+                g_ptr_array_add(includes_to_rescan, fsearch_database_include_ref(include_copy));
+            }
+        }
+        else {
+            // Keep the include object the existing index refers to, so scan results (e.g. last scan time) keep
+            // ending up in the include manager, and only update the settings that don't affect the index.
+            fsearch_database_include_set_rescan_after(include, fsearch_database_include_get_rescan_after(new_include));
+            fsearch_database_include_set_scan_after_launch(include,
+                                                           fsearch_database_include_get_scan_after_launch(new_include));
+            fsearch_database_include_manager_add(merged_include_manager, include);
+        }
+    }
+
+    fsearch_database_index_store_set_include_manager(self->store, merged_include_manager);
+    g_set_object(&self->include_manager, merged_include_manager);
+    if (self->rescan_manager) {
+        fsearch_database_rescan_manager_notify_new_config(self->rescan_manager, merged_include_manager);
+    }
+
+    g_info("[scan] folder settings changed, rescanning %u of %u folders", includes_to_rescan->len, includes->len);
+
+    if (includes_to_rescan->len == 0) {
+        database_clear_scan_cancellable_if_current(self, work);
+        return true;
+    }
+
+    g_autoptr(GCancellable) cancellable = fsearch_database_work_get_cancellable(work);
+    for (uint32_t i = 0; i < includes_to_rescan->len; i++) {
+        FsearchDatabaseInclude *include = g_ptr_array_index(includes_to_rescan, i);
+        g_autoptr(FsearchDatabaseIndex) new_index = fsearch_database_index_store_create_index_for_include(self->store,
+                                                                                                          include);
+        if (!new_index) {
+            continue;
+        }
+        g_info("[scan] rescanning %s", fsearch_database_include_get_path(include));
+        signal_emit0(self, SIGNAL_SCAN_STARTED);
+        g_autoptr(FsearchDatabaseWork) new_work = fsearch_database_work_new_rescan_index_finished(new_index,
+                                                                                                  cancellable);
+        g_thread_pool_push(self->io_pool, g_steal_pointer(&new_work), NULL);
+    }
+    return true;
+}
+
 static void
 database_scan(FsearchDatabase *self, FsearchDatabaseWork *work) {
     // DB must be locked
@@ -854,6 +955,10 @@ database_scan(FsearchDatabase *self, FsearchDatabaseWork *work) {
     }
 
     g_clear_pointer(&locker, g_mutex_locker_free);
+
+    if (database_apply_include_settings(self, work, include_manager, exclude_manager, flags)) {
+        return;
+    }
 
     signal_emit0(self, SIGNAL_SCAN_STARTED);
 

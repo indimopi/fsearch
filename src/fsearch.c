@@ -39,6 +39,8 @@
 #include <gio/gio.h>
 #include <gio/gmenumodel.h>
 #include <glib-object.h>
+#include <glib-unix.h>
+#include <signal.h>
 #include <glib.h>
 #include <glib/gi18n.h>
 #include <gtk/gtk.h>
@@ -445,6 +447,36 @@ on_database_update_finished(FsearchDatabase *db, FsearchDatabaseInfo *info, gpoi
 }
 
 static void
+on_database_scan_finished(FsearchDatabase *db, FsearchDatabaseInfo *info, gpointer user_data) {
+    FsearchApplication *self = (FsearchApplication *)user_data;
+    on_database_update_finished(db, info, user_data);
+
+    // Write the index after every scan. When running in the background, FSearch usually doesn't get to quit
+    // cleanly (it's still running when the session ends), so without this the next start would load an outdated
+    // index.
+    g_autoptr(FsearchDatabaseWork) work = fsearch_database_work_new_save();
+    fsearch_database_queue_work(self->db, work);
+}
+
+static gboolean
+on_termination_signal(gpointer user_data) {
+    FsearchApplication *self = FSEARCH_APPLICATION(user_data);
+    g_info("[app] received termination signal, shutting down");
+    // Same as Quit: closes the windows and lets the application exit normally, which saves database and config
+    g_action_group_activate_action(G_ACTION_GROUP(self), "quit", NULL);
+    return G_SOURCE_CONTINUE;
+}
+
+static void
+on_session_query_end(GtkApplication *app, gpointer user_data) {
+    FsearchApplication *self = FSEARCH_APPLICATION(app);
+    g_info("[app] session is ending, saving database and config");
+    config_save(self->config);
+    g_autoptr(FsearchDatabaseWork) work = fsearch_database_work_new_save();
+    fsearch_database_queue_work(self->db, work);
+}
+
+static void
 on_database_load_finished(FsearchDatabase *db, FsearchDatabaseInfo *info, gpointer user_data) {
     FsearchApplication *self = (FsearchApplication *)user_data;
     g_assert(FSEARCH_IS_APPLICATION(self));
@@ -495,7 +527,13 @@ fsearch_application_startup(GApplication *app) {
     g_signal_connect_object(self->db, "load-started", G_CALLBACK(on_database_load_started), self, G_CONNECT_AFTER);
     g_signal_connect_object(self->db, "load-finished", G_CALLBACK(on_database_load_finished), self, G_CONNECT_AFTER);
     g_signal_connect_object(self->db, "scan-started", G_CALLBACK(on_database_scan_started), self, G_CONNECT_AFTER);
-    g_signal_connect_object(self->db, "scan-finished", G_CALLBACK(on_database_update_finished), self, G_CONNECT_AFTER);
+    g_signal_connect_object(self->db, "scan-finished", G_CALLBACK(on_database_scan_finished), self, G_CONNECT_AFTER);
+
+    // Shut down cleanly (saving database and config) when the system or session asks us to terminate
+    g_unix_signal_add(SIGTERM, on_termination_signal, self);
+    g_unix_signal_add(SIGINT, on_termination_signal, self);
+    g_unix_signal_add(SIGHUP, on_termination_signal, self);
+    g_signal_connect(self, "query-end", G_CALLBACK(on_session_query_end), NULL);
 
     g_autoptr(FsearchDatabaseWork) work_load = fsearch_database_work_new_load();
     fsearch_database_queue_work(self->db, work_load);
@@ -944,6 +982,9 @@ fsearch_application_new(void) {
                                             fsearch_bus_name,
                                             "flags",
                                             G_APPLICATION_HANDLES_COMMAND_LINE,
+                                            // Needed for the "query-end" signal, so we can save before logout
+                                            "register-session",
+                                            TRUE,
                                             NULL);
     fsearch_application_add_option_entries(self);
     return self;

@@ -450,6 +450,10 @@ static void
 on_database_scan_finished(FsearchDatabase *db, FsearchDatabaseInfo *info, gpointer user_data) {
     FsearchApplication *self = (FsearchApplication *)user_data;
     on_database_update_finished(db, info, user_data);
+    if (self->num_files == 0 && self->num_folders == 0) {
+        // Cancelled scan or nothing loaded yet: don't replace the saved index with an empty one
+        return;
+    }
 
     // Write the index after every scan. When running in the background, FSearch usually doesn't get to quit
     // cleanly (it's still running when the session ends), so without this the next start would load an outdated
@@ -465,15 +469,6 @@ on_termination_signal(gpointer user_data) {
     // Same as Quit: closes the windows and lets the application exit normally, which saves database and config
     g_action_group_activate_action(G_ACTION_GROUP(self), "quit", NULL);
     return G_SOURCE_CONTINUE;
-}
-
-static void
-on_session_query_end(GtkApplication *app, gpointer user_data) {
-    FsearchApplication *self = FSEARCH_APPLICATION(app);
-    g_info("[app] session is ending, saving database and config");
-    config_save(self->config);
-    g_autoptr(FsearchDatabaseWork) work = fsearch_database_work_new_save();
-    fsearch_database_queue_work(self->db, work);
 }
 
 static void
@@ -533,7 +528,6 @@ fsearch_application_startup(GApplication *app) {
     g_unix_signal_add(SIGTERM, on_termination_signal, self);
     g_unix_signal_add(SIGINT, on_termination_signal, self);
     g_unix_signal_add(SIGHUP, on_termination_signal, self);
-    g_signal_connect(self, "query-end", G_CALLBACK(on_session_query_end), NULL);
 
     g_autoptr(FsearchDatabaseWork) work_load = fsearch_database_work_new_load();
     fsearch_database_queue_work(self->db, work_load);
@@ -982,9 +976,6 @@ fsearch_application_new(void) {
                                             fsearch_bus_name,
                                             "flags",
                                             G_APPLICATION_HANDLES_COMMAND_LINE,
-                                            // Needed for the "query-end" signal, so we can save before logout
-                                            "register-session",
-                                            TRUE,
                                             NULL);
     fsearch_application_add_option_entries(self);
     return self;
